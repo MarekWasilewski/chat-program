@@ -13,10 +13,12 @@ public class Client extends JFrame{
     private static JTextField tfChatInput;
     private static JTextField tfUser;
 
-    private static Socket socket;
     private static PrintWriter writer;
     private static BufferedReader reader;
     private static int port = 2222;
+
+    private static String username;
+    private static boolean isConnected = false;
 
     public Client() {
         initializeComponents();
@@ -84,29 +86,80 @@ public class Client extends JFrame{
     }
 
     private void bSendActionPerformed(ActionEvent ae) {
-        try {
-            writer.println(tfChatInput.getText());
-            writer.flush();
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (isConnected) {
+            if (tfChatInput.getText().trim().equals("")) {
+                tfChatInput.setText("");
+            } else {
+                try {
+                    username = tfUser.getText();
+                    writer.println(username + ";" + tfChatInput.getText() + ";" + "CHAT");
+                    writer.flush();
+                } catch (Exception e) {
+                    taChat.append("Message was not sent...\n");
+                }
+                tfChatInput.setText("");
+            }
+        } else {
+            taChat.append("Not connected to the server...\n");
+            tfChatInput.setText("");
         }
-        tfChatInput.setText("");
     }
 
     private void bConnectActionPerformed(ActionEvent ae) {
-        if (Objects.equals(tfUser.getText(), "")) {
-            JOptionPane.showMessageDialog(null,"Must choose a username!","Error!",JOptionPane.WARNING_MESSAGE);
+        if (!isConnected) {
+            username = tfUser.getText();
+            if (Objects.equals(username, "")) {
+                taChat.append("You need to choose a username before you connect to the server...\n");
+            } else {
+                try {
+                    Socket socket = new Socket("localhost", port);
+                    InputStreamReader inputStreamReader = new InputStreamReader(socket.getInputStream());
+                    reader = new BufferedReader(inputStreamReader);
+                    writer = new PrintWriter(socket.getOutputStream());
+                    writer.println(username + ";has connected;CONNECTED");
+                    writer.flush();
+                    isConnected = true;
+                    tfUser.setEditable(false);
+                } catch (Exception e) {
+                    taChat.append("Could not connect to the server, try again...\n");
+                    tfUser.setEditable(true);
+                }
+                ListenThread();
+            }
         } else {
+            taChat.append("You are already connected to the server...\n");
+        }
+    }
+
+    private void ListenThread()
+    {
+        Thread IncomingReader = new Thread(new IncomingReader());
+        IncomingReader.start();
+    }
+
+    private class IncomingReader implements Runnable{
+        @Override
+        public void run() {
+            String stream, connected = "CONNECTED", disconnected = "DISCONNECTED", chat = "CHAT";
+            String[] streamInformation;
+
             try {
-                tfUser.setEditable(false);
-                socket = new Socket("localhost", port);
-                InputStreamReader inputStreamReader = new InputStreamReader(socket.getInputStream());
-                reader = new BufferedReader(inputStreamReader);
-                writer = new PrintWriter(socket.getOutputStream());
-                writer.println("User has connected...");
-                writer.flush();
-            } catch (Exception e) {
-                e.printStackTrace();
+                while ((stream = reader.readLine()) != null) {
+                    streamInformation = stream.split(";");
+                    if (streamInformation[2].equals(chat)) {
+                        taChat.append(streamInformation[0] + ": " + streamInformation[1] + "\n");
+//                        taChat.setCaretPosition(taChat.getDocument().getLength());
+                    } else if (streamInformation[2].equals(connected)) {
+                        taChat.append(streamInformation[0] + " connected...\n");
+//                        taChat.removeAll();
+                    } else if (streamInformation[2].equals(disconnected)) {
+                        //
+                    } else {
+                        //
+                    }
+                }
+            } catch (Exception ex) {
+                //
             }
         }
     }

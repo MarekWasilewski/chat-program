@@ -9,13 +9,9 @@ import java.util.ArrayList;
 public class Server extends JFrame{
     private static JButton bStart;
     private static JButton bStop;
-    private static JTextArea taChat;
+    private static JTextArea taServerStatus;
 
-    private static ServerSocket ssocket;
-    private static Socket socket;
-    private static DataInputStream din;
-
-    private ArrayList clientOutputStream;
+    private static ArrayList<PrintWriter> clientWriters;
 
     public Server() {
         initializeComponents();
@@ -24,7 +20,7 @@ public class Server extends JFrame{
     private void initializeComponents() {
         bStart = new JButton();
         bStop = new JButton();
-        taChat = new JTextArea();
+        taServerStatus = new JTextArea();
 
         int screenWidth = 600;
         int screenHeight = 500;
@@ -41,8 +37,8 @@ public class Server extends JFrame{
         bStop.setText("Stop server");
         bStop.setFont(new Font("Arial", Font.BOLD, 12));
         bStop.addActionListener(e -> bStopActionPerformed(e));
-        taChat.setBorder(BorderFactory.createLineBorder(new Color(0, 0, 0)));
-        taChat.setEditable(false);
+        taServerStatus.setBorder(BorderFactory.createLineBorder(new Color(0, 0, 0)));
+        taServerStatus.setEditable(false);
 
         GroupLayout layout = new GroupLayout(getContentPane());
         layout.setAutoCreateGaps(true);
@@ -50,14 +46,14 @@ public class Server extends JFrame{
         getContentPane().setLayout(layout);
 
         layout.setHorizontalGroup(layout.createParallelGroup()
-                .addComponent(taChat)
+                .addComponent(taServerStatus)
                 .addGroup(layout.createSequentialGroup()
                         .addComponent(bStart, GroupLayout.DEFAULT_SIZE, screenWidth / 2, GroupLayout.PREFERRED_SIZE)
                         .addComponent(bStop, GroupLayout.DEFAULT_SIZE, screenWidth / 2, GroupLayout.PREFERRED_SIZE)
                 )
         );
         layout.setVerticalGroup(layout.createSequentialGroup()
-                .addComponent(taChat)
+                .addComponent(taServerStatus)
                 .addGroup(layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
                         .addComponent(bStart)
                         .addComponent(bStop)
@@ -67,22 +63,52 @@ public class Server extends JFrame{
 
     private class ClientHandler implements Runnable {
         BufferedReader reader;
-        Socket socket;
         PrintWriter client;
 
-        @Override
-        public void run() {
-            //TODO
-        }
-
-        public ClientHandler(Socket clientSocket, PrintWriter user) {
+        ClientHandler(Socket clientSocket, PrintWriter user) {
             client = user;
             try {
-                socket = clientSocket;
                 InputStreamReader inputStreamReader = new InputStreamReader(clientSocket.getInputStream());
                 reader = new BufferedReader(inputStreamReader);
             } catch (Exception e) {
-                taChat.append("Unexpected error...\n");
+                taServerStatus.append("An unexpected error occurred...\n");
+            }
+        }
+
+        @Override
+        public void run() {
+            String message, connected = "CONNECTED", disconnected = "DISCONNECTED", chat = "CHAT";
+            String[] messageInformation;
+
+            try {
+                while ((message = reader.readLine()) != null) {
+                    taServerStatus.append(message + "\n");
+                    messageInformation = message.split(";");
+                    if (messageInformation[2].trim().equals(connected)) {
+                        printMessage(messageInformation[0] + ";" + messageInformation[1] + ";" + connected);
+                    } else if (messageInformation[2].trim().equals(disconnected)) {
+                        printMessage(messageInformation[0] + ";" + messageInformation[1] + ";" + disconnected);
+                    } else if (messageInformation[2].trim().equals(chat)) {
+                        printMessage(message);
+                    } else {
+                        taServerStatus.append("Message contained errors...\n");
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void printMessage(String message) {
+        for (PrintWriter writer : clientWriters) {
+            try {
+                writer.println(message);
+                taServerStatus.append("Sending " + message + "\n");
+                writer.flush();
+//                taServerStatus.setCaretPosition(taServerStatus.getDocument().getLength());
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
     }
@@ -90,18 +116,19 @@ public class Server extends JFrame{
     private class ServerStart implements Runnable {
         @Override
         public void run() {
+            clientWriters = new ArrayList();
             try {
-                ssocket = new ServerSocket(2222);
+                ServerSocket serverSocket = new ServerSocket(2222);
                 while (true) {
-                    socket = ssocket.accept();
-                    PrintWriter writer = new PrintWriter(socket.getOutputStream());
-                    clientOutputStream.add(writer);
-
-                    //TODO: Thread für Client
-                    taChat.append("Got a client connection...\n");
+                    Socket clientSocket = serverSocket.accept();
+                    PrintWriter writer = new PrintWriter(clientSocket.getOutputStream());
+                    clientWriters.add(writer);
+                    Thread listener = new Thread(new ClientHandler(clientSocket, writer));
+                    listener.start();
+                    taServerStatus.append("Got a client connection...\n");
                 }
             } catch (Exception e) {
-                taChat.append("Some exception occured...\n");
+                taServerStatus.append("Some exception occurred...\n");
             }
         }
     }
@@ -109,7 +136,7 @@ public class Server extends JFrame{
     private void bStartActionPerformed(ActionEvent ae) {
         Thread starter = new Thread(new ServerStart());
         starter.start();
-        taChat.append("Server started...\n");
+        taServerStatus.append("Server started...\n");
     }
 
     private void bStopActionPerformed(ActionEvent ae) {
