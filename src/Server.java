@@ -1,9 +1,7 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -17,7 +15,7 @@ public class Server extends JFrame{
     private static Socket socket;
     private static DataInputStream din;
 
-    private ArrayList clientOS;
+    private ArrayList clientOutputStream;
 
     public Server() {
         initializeComponents();
@@ -70,11 +68,22 @@ public class Server extends JFrame{
     private class ClientHandler implements Runnable {
         BufferedReader reader;
         Socket socket;
-        PrintWriter writer;
+        PrintWriter client;
 
         @Override
         public void run() {
 
+        }
+
+        public ClientHandler(Socket clientSocket, PrintWriter user) {
+            client = user;
+            try {
+                socket = clientSocket;
+                InputStreamReader inputStreamReader = new InputStreamReader(clientSocket.getInputStream());
+                reader = new BufferedReader(inputStreamReader);
+            } catch (Exception e) {
+                taChat.append("Unexpected error...\n");
+            }
         }
     }
 
@@ -86,13 +95,13 @@ public class Server extends JFrame{
                 while (true) {
                     socket = ssocket.accept();
                     PrintWriter writer = new PrintWriter(socket.getOutputStream());
-                    clientOS.add(writer);
+                    clientOutputStream.add(writer);
 
                     //Thread für Client
                     taChat.append("Got a client connection...\n");
                 }
             } catch (Exception e) {
-                taChat.append("Error, Server did not start...\n");
+                taChat.append("Some exception occured...\n");
             }
         }
     }
