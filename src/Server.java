@@ -72,7 +72,7 @@ public class Server extends JFrame{
 
         @Override
         public void run() {
-
+            //TODO
         }
 
         public ClientHandler(Socket clientSocket, PrintWriter user) {
@@ -97,7 +97,7 @@ public class Server extends JFrame{
                     PrintWriter writer = new PrintWriter(socket.getOutputStream());
                     clientOutputStream.add(writer);
 
-                    //Thread für Client
+                    //TODO: Thread für Client
                     taChat.append("Got a client connection...\n");
                 }
             } catch (Exception e) {
